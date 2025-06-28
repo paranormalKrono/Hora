@@ -1,74 +1,51 @@
 using System.Collections;
 using UnityEngine;
-using UnityEngine.Events;
 
 public class CameraMover : MonoBehaviour
 {
-
-    [SerializeField] private MenuUI _MenuUI;
-    [SerializeField] private float _menuMoveSpeed = 10f;
-    [SerializeField] private float _menuRotationSpeed = 15f;
-    [SerializeField] private float _gameSpeed = 25f;
-    [SerializeField] private Transform _menuPlace;
-    [SerializeField] private Transform _settingsPlace;
-    [SerializeField] private Transform _gamePlace;
+    [SerializeField] private Transform _cameraTr;
     [SerializeField] private Transform _gameCenter;
 
+    [SerializeField] private float _moveSpeed = 10f;
+    [SerializeField] private float _rotationSpeed = 15f;
+    [SerializeField] private float _sphereSpeed = 25f;
+
     private bool _isMoving = false;
-    private bool _isGame = false;
     private IEnumerator _IMove;
 
-    public UnityAction OnMoved;
+    public delegate void Callback();
 
-    private void Start()
+    public void CameraSphereLook(Vector2 axis)
     {
-        _MenuUI._OnSwitchMenuToSettings += () => MoveCameraTo(_settingsPlace);
-        _MenuUI._OnSwitchSettingsToMenu += () => MoveCameraTo(_menuPlace);
-        _MenuUI._OnSwitchMenuToGame += () => MoveCameraTo(_gamePlace);
-        _MenuUI._OnSwitchGameToMenu += () =>
-        {
-            _isGame = false;
-            MoveCameraTo(_menuPlace);
-        };
-
-        _MenuUI._OnHoraUp += () => _isGame = true;
+        Vector3 right = _cameraTr.up * axis.x;
+        Vector3 left = _cameraTr.right * axis.y;
+        _cameraTr.RotateAround(_gameCenter.position, left + right, _sphereSpeed);
     }
 
-    public void CameraLook(Vector2 axis)
-    {
-        if (_isGame)
-        {
-            Vector3 right = transform.up * axis.x;
-            Vector3 left = transform.right * axis.y;
-            transform.RotateAround(_gameCenter.position, left + right, _gameSpeed);
-            // Quaternion lookRotation = Quaternion.LookRotation(_gameCenter.position - transform.position, transform.up);
-        }
-    }
-
-    private void MoveCameraTo(Transform target)
+    public void MoveCameraTo(Transform target, Callback OnMoved = null)
     {
         if (_isMoving)
         {
             StopCoroutine(_IMove);
         }
-        _IMove = IMove(target.position, target.rotation);
+        _IMove = IMove(target.position, target.rotation, OnMoved);
         StartCoroutine(_IMove);
     }
 
-    private IEnumerator IMove(Vector3 point, Quaternion rotation)
+    private IEnumerator IMove(Vector3 point, Quaternion rotation, Callback OnMoved)
     {
         _isMoving = true;
-        while (Vector3.Distance(transform.position, point) > 0.1f || Quaternion.Angle(transform.rotation, rotation) > 1f)
+
+        Transform tr = _cameraTr;
+        while (Vector3.Distance(tr.position, point) > 0.1f || Quaternion.Angle(tr.rotation, rotation) > 1f)
         {
             float delta = Time.deltaTime;
-            transform.SetPositionAndRotation(Vector3.MoveTowards(transform.position, point, delta * _menuMoveSpeed), 
-                Quaternion.RotateTowards(transform.rotation, rotation, delta * _menuRotationSpeed));
+            tr.SetPositionAndRotation(Vector3.MoveTowards(tr.position, point, delta * _moveSpeed), 
+                Quaternion.RotateTowards(tr.rotation, rotation, delta * _rotationSpeed));
             yield return null;
         }
-        if (OnMoved != null)
-        {
-            OnMoved();
-        }
+
+        OnMoved?.Invoke();
         _isMoving = false;
     }
 }

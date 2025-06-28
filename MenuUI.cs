@@ -1,329 +1,247 @@
 using System;
-using System.Collections;
-using Unity.Mathematics;
 using UnityEngine;
+using UnityEngine.Audio;
 using UnityEngine.Events;
 using UnityEngine.UIElements;
 
 public class MenuUI : MonoBehaviour
 {
-    [SerializeField] private float _horaCenterTime = 5f;
-    [SerializeField] private float _horaUpTime = 2f;
-    [SerializeField] private float _timeToPause = 2f;
-    [SerializeField] private float _defeatTime = 4f;
+    [SerializeField] private UIDocument UIDocument;
+    [SerializeField] private AudioMixer audioMixer;
 
-    private VisualElement _mainMenu;
-    private VisualElement _panelHora;
-    private VisualElement _containerHora;
-    private VisualElement _settingsMenu;
-    private VisualElement _actionsMenu;
-    private VisualElement _storyMenu;
-    private VisualElement _defeatMenu;
+    private VisualElement _panelMain;
+    private VisualElement _panelTimerHora;
+    private VisualElement _panelTimerGlobal;
+    private VisualElement _panelSettings;
+    private VisualElement _panelTitles;
+    private VisualElement _panelActions;
+    private VisualElement _panelStory;
+    private VisualElement _panelTutorHuman;
+    private VisualElement _panelTutorRed;
+    private VisualElement _panelDefeat;
+    private VisualElement _panelContinue;
 
     private Button _buttonPlay;
     private Button _buttonSettings;
-    private Button _buttonExit;
     private Button _buttonSettingsClose;
+    private Button _buttonTitles;
+    private Button _buttonTitlesClose;
+    private Button _buttonExit;
 
-    private Label _horaTimer;
-    private Label _horaTimerHuman;
-    private Label _horaTimerRed;
+    private Label _labelTimerHora;
+    private Label _labelTimerGlobal;
+    private Label _labelScoreHuman;
+    private Label _labelScoreRed;
+    private Label _labelScoreTotal;
 
-    public UnityAction _OnHoraCenter;
-    public UnityAction _OnHoraUp;
-    public UnityAction _OnMainMenu;
-    public UnityAction _OnGameMenu;
-    public UnityAction _OnSwitchMenuToSettings;
-    public UnityAction _OnSwitchSettingsToMenu;
-    public UnityAction _OnSwitchMenuToGame;
-    public UnityAction _OnSwitchGameToMenu;
-    public UnityAction _OnTimer;
+    private DropdownField _settingsTranslation;
 
-    private IEnumerator _ITimer;
-    private IEnumerator _ITimerChange;
+    private DateTime _timerGlobalDate;
 
-    private enum MenuState
+    public enum Menu
     {
-        MainMenu,
+        Main,
         Settings,
-        Game,
-        Unknown
+        Titles,
+        Story,
+        TutorHuman,
+        TutorRed,
+        TimerCenter,
+        TimerUp,
+        Actions,
+        Defeat,
+        Score,
+        Continue,
+        TimerGlobal,
     }
 
-    private MenuState _state = MenuState.MainMenu;
-    private bool isFreshStart = true;
+    public UnityAction<ClickEvent> _OnPlay;
+    public UnityAction<ClickEvent> _OnSettings;
+    public UnityAction<ClickEvent> _OnSettingsClose;
+    public UnityAction<ClickEvent> _OnTitles;
+    public UnityAction<ClickEvent> _OnTitlesClose;
+    public UnityAction<ClickEvent> _OnExit;
 
-    public float _currentTimerValue = 0f;
-    public bool _isTimer = false;
-    public bool _isTimerChange = false;
-
-    public float CurrentTimerValue { get => _currentTimerValue; }
-    public bool IsTimer { get => _isTimer; }
 
     private void Awake()
     {
-        VisualElement root = GetComponent<UIDocument>().rootVisualElement;
+        VisualElement root = UIDocument.rootVisualElement;
 
-        _mainMenu = root.Q<VisualElement>("PanelMenu");
-        _panelHora = root.Q<VisualElement>("PanelHora");
-        _containerHora = root.Q<VisualElement>("ContainerHora");
-        _settingsMenu = root.Q<VisualElement>("PanelSettings");
-        _actionsMenu = root.Q<VisualElement>("PanelActions");
-        _storyMenu = root.Q<VisualElement>("PanelStory");
-        _defeatMenu = root.Q<VisualElement>("PanelDefeat");
+        _panelMain = root.Q<VisualElement>("PanelMenu");
+        _panelTimerHora = root.Q<VisualElement>("PanelTimerHora");
+        _panelTimerGlobal = root.Q<VisualElement>("PanelTimerGlobal");
+        _panelSettings = root.Q<VisualElement>("PanelSettings");
+        _panelTitles = root.Q<VisualElement>("PanelTitles");
+        _panelActions = root.Q<VisualElement>("PanelActions");
+        _panelStory = root.Q<VisualElement>("PanelStory");
+        _panelTutorHuman = root.Q<VisualElement>("PanelTutorHuman");
+        _panelTutorRed = root.Q<VisualElement>("PanelTutorRed");
+        _panelDefeat = root.Q<VisualElement>("PanelDefeat");
+        _panelContinue = root.Q<VisualElement>("PanelContinue");
+
+
+        _labelTimerHora = root.Q<Label>("LabelTimerHora");
+        _labelTimerGlobal = root.Q<Label>("LabelTimerGlobal");
+        _labelScoreHuman = root.Q<Label>("HoraScoreHuman");
+        _labelScoreRed = root.Q<Label>("HoraScoreRed");
+        _labelScoreTotal = root.Q<Label>("HoraScoreTotal");
+
 
         _buttonPlay = root.Q<Button>("ButtonPlay");
-        _buttonPlay.RegisterCallback<ClickEvent>(OnPlayButtonClicked);
-        _buttonExit = root.Q<Button>("ButtonExit");
         _buttonSettings = root.Q<Button>("ButtonSettings");
-        _buttonSettings.RegisterCallback<ClickEvent>(OnSettingsButtonClicked);
         _buttonSettingsClose = root.Q<Button>("ButtonSettingsClose");
-        _buttonSettingsClose.RegisterCallback<ClickEvent>(OnSettingsCloseButtonClicked);
+        _buttonTitles = root.Q<Button>("ButtonTitles");
+        _buttonTitlesClose = root.Q<Button>("ButtonTitlesClose");
+        _buttonExit = root.Q<Button>("ButtonExit");
 
-        _horaTimer = root.Q<Label>("HoraTimer");
-        _horaTimerHuman = root.Q<Label>("HoraTimerHuman");
-        _horaTimerRed = root.Q<Label>("HoraTimerRed");
 
-        DisableSettings();
-    }
+        _buttonPlay.RegisterCallback((ClickEvent clickEvent) => _OnPlay?.Invoke(clickEvent));
+        _buttonSettings.RegisterCallback((ClickEvent clickEvent) => _OnSettings?.Invoke(clickEvent));
+        _buttonSettingsClose.RegisterCallback((ClickEvent clickEvent) => _OnSettingsClose?.Invoke(clickEvent));
+        _buttonTitles.RegisterCallback((ClickEvent clickEvent) => _OnTitles?.Invoke(clickEvent));
+        _buttonTitlesClose.RegisterCallback((ClickEvent clickEvent) => _OnTitlesClose?.Invoke(clickEvent));
 
-    public void HoraUp()
-    {
-        StartCoroutine(IHoraUp());
-    }
-
-    public void ChangeTimer(float value, float hum, float red)
-    {
-        if (_isTimerChange)
+        _settingsTranslation = root.Q<DropdownField>("DropdownTranslation");
+        _settingsTranslation.RegisterValueChangedCallback((evt) =>
         {
-            _isTimerChange = false;
-            _horaTimerHuman.AddToClassList("hora_timer_human_hide");
-            _horaTimerRed.AddToClassList("hora_timer_human_hide");
-            StopCoroutine(_ITimerChange);
-        }
-        _horaTimerHuman.text = ((int)hum).ToString();
-        _horaTimerRed.text = "+" + ((int)red).ToString();
-        _ITimerChange = ITimerChange();
-        StartCoroutine(_ITimerChange);
-        ChangeTimer(value);
-    }
+            LoadTranslation(evt.newValue);
+        });
+        LoadTranslation("EN");
 
-    public void ChangeTimer(float value)
-    {
-        _currentTimerValue += value;
-        SetUITimerValue();
-    }
-
-    public void TimerSetValue(float value) {
-        _currentTimerValue = value;
-        SetUITimerValue();
-    }
-
-    public void StartTimer(float target_value, float speed)
-    {
-        if (_isTimer)
+        Slider sliderMusic = root.Q<Slider>("SliderMusic");
+        sliderMusic.RegisterValueChangedCallback((evt) =>
         {
-            _isTimer = false;
-            StopCoroutine(_ITimer);
-        }
-        _ITimer = ITimer(target_value, speed);
-        StartCoroutine(_ITimer);
-    }
+            audioMixer.SetFloat("Music", evt.newValue);
+        });
 
-    public void StopTimers() {
-        if (_isTimer)
+        Slider sliderEffects = root.Q<Slider>("SliderEffects");
+        sliderEffects.RegisterValueChangedCallback((evt) =>
         {
-            _isTimer = false;
-            StopCoroutine(_ITimer);
-        }
-        if (_isTimerChange)
+            audioMixer.SetFloat("Effects", evt.newValue);
+        });
+    }
+
+    public void TimerHoraScoreChange(float scoreHuman, float scoreRed)
+    {
+        _labelScoreHuman.text = "-" + ((int)scoreHuman).ToString();
+        _labelScoreRed.text = "+" + ((int)scoreRed).ToString();
+        int total = (int)(scoreRed - scoreHuman);
+        _labelScoreTotal.text = total > 0 ? "+" + total : total.ToString();
+    }
+
+    public void TimerHoraSet(int value)
+    {
+        // I thought animation can be here, something different from label.
+        // $"{ts.Days}:{ts.Hours}:{ts.Minutes}:{ts.Seconds}";
+        _labelTimerHora.text = "00:00:" + TimeSpan.FromSeconds(value).ToString(@"dd\:hh\:mm\:ss");
+    }
+
+    public void TimerGlobalSet(DateTime value)
+    {
+        _timerGlobalDate = value;
+    }
+
+    public void TimerGlobalAddOneDay()
+    {
+        _timerGlobalDate = _timerGlobalDate.AddDays(1);
+        _labelTimerGlobal.text = _timerGlobalDate.ToString("dd.MM.yyyy");
+    }
+
+    public void OpenMenu(Menu menu)
+    {
+        switch (menu)
         {
-            _isTimerChange = false;
-            _horaTimerHuman.AddToClassList("hora_timer_human_hide");
-            _horaTimerRed.AddToClassList("hora_timer_human_hide");
-            StopCoroutine(_ITimerChange);
-        }
-    }
-
-    public void ToMainMenu()
-    {
-        StartCoroutine(IToMainMenu());
-    }
-
-    public void ToGameMenu()
-    {
-        StartCoroutine(IToGameMenu());
-    }
-
-    public void ShowDefeat()
-    {
-        StartCoroutine(IDefeat());
-    }
-
-    private void OnPlayButtonClicked(ClickEvent clickEvent)
-    {
-        Debug.Log("Play clicked");
-        if (_state == MenuState.MainMenu)
-        {
-            if (isFreshStart)
-            {
-                isFreshStart = false;
-                StartCoroutine(IHoraCenter());
-            }
-            else
-            {
-                _panelHora.AddToClassList("panel_hora_center");
-                DisableMainMenu();
-                HoraUp();
-            }
-        }
-    }
-
-    private IEnumerator IHoraCenter()
-    {
-        _storyMenu.RemoveFromClassList("panel_story_hide");
-        _panelHora.AddToClassList("panel_hora_center"); 
-        DisableMainMenu();
-        yield return new WaitForSeconds(_horaCenterTime);
-        _storyMenu.AddToClassList("panel_story_hide");
-        _OnHoraCenter();
-    }
-
-    private void OnSettingsButtonClicked(ClickEvent clickEvent)
-    {
-        Debug.Log("Settings clicked");
-        if (_state == MenuState.MainMenu)
-        {
-            _OnSwitchMenuToSettings();
-            DisableMainMenu();
-            EnableSettings();
+            case Menu.Main:
+                _panelMain.RemoveFromClassList("hideMain");
+                break;
+            case Menu.Settings:
+                _panelSettings.RemoveFromClassList("hideSettings");
+                break;
+            case Menu.Story:
+                _panelStory.RemoveFromClassList("hideStory");
+                _panelTutorHuman.RemoveFromClassList("hideTutorHuman");
+                _panelTutorRed.RemoveFromClassList("hideTutorRed");
+                break;
+            case Menu.TimerCenter:
+                _panelTimerHora.AddToClassList("centerTimer");
+                break;
+            case Menu.TimerUp:
+                _panelTimerHora.AddToClassList("upTimer");
+                break;
+            case Menu.TimerGlobal:
+                _panelTimerGlobal.RemoveFromClassList("hideGlobalTime");
+                break;
+            case Menu.Actions:
+                _panelActions.RemoveFromClassList("hideActions");
+                break;
+            case Menu.Defeat:
+                _panelDefeat.RemoveFromClassList("hideDefeat");
+                break;
+            case Menu.Score:
+                _labelScoreHuman.RemoveFromClassList("hideScore");
+                _labelScoreRed.RemoveFromClassList("hideScore");
+                _labelScoreTotal.RemoveFromClassList("hideScore");
+                break;
+            case Menu.Continue:
+                _panelContinue.RemoveFromClassList("hideContinue");
+                break;
+            case Menu.Titles:
+                _panelTitles.RemoveFromClassList("hideTitles");
+                break;
         }
     }
 
-    private void OnSettingsCloseButtonClicked(ClickEvent clickEvent)
+    public void CloseMenu(Menu menu)
     {
-        Debug.Log("Settings close clicked");
-        if (_state == MenuState.Settings)
+        switch (menu)
         {
-            _OnSwitchSettingsToMenu();
-            EnableMainMenu();
-            DisableSettings();
+            case Menu.Main:
+                _panelMain.AddToClassList("hideMain");
+                break;
+            case Menu.Settings:
+                _panelSettings.AddToClassList("hideSettings");
+                break;
+            case Menu.Story:
+                _panelStory.AddToClassList("hideStory");
+                _panelTutorHuman.AddToClassList("hideTutorHuman");
+                _panelTutorRed.AddToClassList("hideTutorRed");
+                break;
+            case Menu.TimerCenter:
+                _panelTimerHora.RemoveFromClassList("centerTimer");
+                break;
+            case Menu.TimerUp:
+                _panelTimerHora.RemoveFromClassList("upTimer");
+                break;
+            case Menu.TimerGlobal:
+                _panelTimerGlobal.AddToClassList("hideGlobalTime");
+                break;
+            case Menu.Actions:
+                _panelActions.AddToClassList("hideActions");
+                break;
+            case Menu.Defeat:
+                _panelDefeat.AddToClassList("hideDefeat");
+                break;
+            case Menu.Score:
+                _labelScoreHuman.AddToClassList("hideScore");
+                _labelScoreRed.AddToClassList("hideScore");
+                _labelScoreTotal.AddToClassList("hideScore");
+                break;
+            case Menu.Continue:
+                _panelContinue.AddToClassList("hideContinue");
+                break;
+            case Menu.Titles:
+                _panelTitles.AddToClassList("hideTitles");
+                break;
         }
     }
 
-    private void DisableSettings()
-    {
-        _settingsMenu.AddToClassList("settings_hide");
-        _buttonSettingsClose.SetEnabled(false);
-    }
 
-    private void EnableSettings()
+    private void LoadTranslation(string id)
     {
-        _state = MenuState.Settings;
-        _settingsMenu.RemoveFromClassList("settings_hide");
-        _buttonSettingsClose.SetEnabled(true);
-    }
-
-    private void DisableMainMenu()
-    {
-        _mainMenu.AddToClassList("main_menu_hide");
-        _buttonPlay.SetEnabled(false);
-        _buttonSettings.SetEnabled(false);
-        _buttonExit.SetEnabled(false);
-    }
-    private void EnableMainMenu()
-    {
-        _state = MenuState.MainMenu;
-        _mainMenu.RemoveFromClassList("main_menu_hide");
-        _buttonPlay.SetEnabled(true);
-        _buttonSettings.SetEnabled(true);
-        _buttonExit.SetEnabled(true);
-    }
-
-    private IEnumerator IHoraUp()
-    {
-        _OnSwitchMenuToGame();
-        _containerHora.AddToClassList("container_hora_up");
-        yield return new WaitForSeconds(_horaUpTime);
-        _actionsMenu.RemoveFromClassList("actions_hide");
-        _state = MenuState.Game;
-        _OnHoraUp();
-    }
-
-    private IEnumerator IToMainMenu()
-    {
-        _OnSwitchGameToMenu();
-        _state = MenuState.Unknown;
-        _panelHora.RemoveFromClassList("panel_hora_center");
-        _containerHora.RemoveFromClassList("container_hora_up");
-        _actionsMenu.AddToClassList("actions_hide");
-        yield return new WaitForSeconds(_timeToPause);
-        EnableMainMenu();
-        _state = MenuState.MainMenu;
-        _OnMainMenu();
-    }
-
-    private IEnumerator IToGameMenu()
-    {
-        _OnSwitchMenuToGame();
-        _state = MenuState.Unknown;
-        _panelHora.AddToClassList("panel_hora_up");
-        _containerHora.AddToClassList("container_hora_up");
-        DisableMainMenu();
-        yield return new WaitForSeconds(_timeToPause);
-        _actionsMenu.RemoveFromClassList("actions_hide");
-        _OnGameMenu();
-        _state = MenuState.Game;
-    }
-
-    private IEnumerator IDefeat()
-    {
-        isFreshStart = true;
-        _defeatMenu.RemoveFromClassList("panel_defeat_hide");
-        yield return new WaitForSeconds(_defeatTime);
-        _defeatMenu.AddToClassList("panel_defeat_hide");
-        ToMainMenu();
-    }
-
-    private void SetUITimerValue()
-    {
-        _horaTimer.text = "00:00:" + TimeSpan.FromSeconds(_currentTimerValue).ToString(@"dd\:hh\:mm\:ss");// $"{ts.Days}:{ts.Hours}:{ts.Minutes}:{ts.Seconds}";
-    }
-
-    private IEnumerator ITimer(float target_value, float speed)
-    {
-        _isTimer = true;
-        float diff = target_value - _currentTimerValue;
-        float change = speed * math.sign(diff);
-        while (math.abs(_currentTimerValue - target_value) > 1f)
-        {
-            float delta = Time.deltaTime;
-            _currentTimerValue += delta * change;
-            SetUITimerValue();
-            yield return null;
-        }
-        if (_currentTimerValue < 0f)
-        {
-            _currentTimerValue = 0f;
-            SetUITimerValue();
-        }
-        _isTimer = false;
-        _OnTimer();
-    }
-
-    private IEnumerator ITimerChange()
-    {
-        _isTimerChange = true;
-        _horaTimerHuman.RemoveFromClassList("hora_timer_human_hide");
-        _horaTimerRed.RemoveFromClassList("hora_timer_human_hide");
-        float t = 3f;
-        while (t > 0)
-        {
-            t -= Time.deltaTime;
-            yield return null;
-        }
-        _horaTimerHuman.AddToClassList("hora_timer_human_hide");
-        _horaTimerRed.AddToClassList("hora_timer_human_hide");
-        _isTimerChange = false;
+        VisualElement root = UIDocument.rootVisualElement;
+        Translation tr = new Translation();
+        tr.LoadUITranslation(id);
+        _settingsTranslation.choices = tr._available;
+        tr.TranslateUIToCurrent(root);
     }
 }

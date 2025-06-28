@@ -11,62 +11,42 @@ public class Rotor : MonoBehaviour
     [SerializeField] private float maxSpeed = 6f;
     [SerializeField] private float tiltSpeed = 0.05f;
 
-    private float currentForce = 1f;
-    private float currentSpeed = 0f;
-    private float targetDir = 1f;
+    private float currentForce;
+    private float rotationDirection;
+    private bool tiltSide;
 
-    private float dirSide = 1f;
-    private bool isTiltSide = true;
+    private float currentSpeed = 0f;
 
     private void Start()
     {
-        if (UnityEngine.Random.Range(-1f, 1f) > 0f)
-        {
-            dirSide = -1f;
-        }
-        else
-        {
-            dirSide = 1f;
-        }
-        isTiltSide = UnityEngine.Random.Range(-1f, 1f) > 0f;
+        Unity.Mathematics.Random random = new Unity.Mathematics.Random();
+        tiltSide = random.NextFloat(-1f, 1f) > 0f;
+        rotationDirection = random.NextFloat(-1f, 1f) > 0f ? -1f : 1f;
 
-        currentForce = UnityEngine.Random.Range(rotationForceMin, rotationForceMax);
+        currentForce = random.NextFloat(rotationForceMin, rotationForceMax);
     }
 
     private void Update()
     {
         float delta = Time.deltaTime;
+
+        // Rotation
         Vector3 v3 = transform.up;
+        if (currentSpeed * rotationDirection < maxSpeed)
+        {
+            currentSpeed += rotationDirection * currentForce * delta;
+        }
+        if ((maxSpeed - currentSpeed * rotationDirection) < 0.1f)
+        {
+            currentForce = Random.Range(rotationForceMin, rotationForceMax);
+            rotationDirection = -rotationDirection;
+        }
         trToRotate.rotation *= Quaternion.Euler(currentSpeed * delta * v3);
 
-        if (currentSpeed * dirSide < maxSpeed)
-        {
-            currentSpeed += dirSide * currentForce * delta;
-        }
-
-        if ((maxSpeed - currentSpeed * dirSide) < 0.1f)
-        {
-            currentForce = UnityEngine.Random.Range(rotationForceMin, rotationForceMax);
-            dirSide = -dirSide; 
-        }
-
-        if (isTiltSide)
-        {
-            tiltToRotate.rotation = Quaternion.Lerp(tiltToRotate.rotation, tilt1.rotation, delta * tiltSpeed);
-            if (Quaternion.Angle(tiltToRotate.rotation, tilt1.rotation) < 2f)
-            {
-                isTiltSide = false;
-            }
-        }
-
-        if (!isTiltSide)
-        {
-            tiltToRotate.rotation = Quaternion.Lerp(tiltToRotate.rotation, tilt2.rotation, delta * tiltSpeed);
-            if (Quaternion.Angle(tiltToRotate.rotation, tilt2.rotation) < 2f)
-            {
-                isTiltSide = true;
-            }
-        }
-
+        // Tilt
+        Quaternion targetTilt = tiltSide ? tilt1.rotation : tilt2.rotation;
+        tiltToRotate.rotation = Quaternion.Lerp(tiltToRotate.rotation, targetTilt, delta * tiltSpeed);
+        if (Quaternion.Angle(tiltToRotate.rotation, targetTilt) < 2f)
+            tiltSide = !tiltSide;
     }
 }
