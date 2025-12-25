@@ -4,36 +4,31 @@ public class BombCreator : MonoBehaviour
 {
     [SerializeField] private AudioSource _bombSound;
     [SerializeField] private GameObject _bombPrefab;
-    [SerializeField] private Mapper _mapper;
-    [SerializeField] private Main _main;
+
     [SerializeField] private Transform _gameCenter;
     [SerializeField] private Transform _cameraTr;
-    [SerializeField] private float bombMoveSpeed = 2.0f;
 
+    [SerializeField] private float _bombMoveSpeed = 2.0f;
+    [SerializeField] private float _bombScrollSpeed = 12.0f;
     [SerializeField] private float _bombRadius = 3f;
 
-    private GameObject curBomb;
+    public struct ExplosionData
+    {
+        public Vector3 position;
+        public float radius;
+    }
+
+    private Transform bomb;
     private bool isBombCreated = false;
 
     public bool IsBombCreated { get { return isBombCreated; } }
-
-    private void Start()
-    {
-        _main.OnGameStateChanged += (Main.GameState gameState) =>
-        {
-            if (gameState != Main.GameState.Game)
-            {
-                RemoveBomb();
-            }
-        };
-    }
 
     public void CreateBomb()
     {
         if (!isBombCreated)
         {
             isBombCreated = true;
-            curBomb = Instantiate(_bombPrefab, _gameCenter);
+            bomb = Instantiate(_bombPrefab, _gameCenter).transform;
         }
     }
 
@@ -41,7 +36,7 @@ public class BombCreator : MonoBehaviour
     {
         if (isBombCreated)
         {
-            curBomb.transform.position += (_cameraTr.right * axis.x + _cameraTr.up * axis.y) * Time.deltaTime * bombMoveSpeed;
+            bomb.position += _bombMoveSpeed * Time.deltaTime * (_cameraTr.right * axis.x + _cameraTr.up * axis.y);
         }
     }
 
@@ -49,16 +44,23 @@ public class BombCreator : MonoBehaviour
     {
         if (isBombCreated)
         {
-            curBomb.transform.position += value * Time.deltaTime * bombMoveSpeed * _cameraTr.forward;
+            bomb.position += value * Time.deltaTime * _bombScrollSpeed * _cameraTr.forward;
         }
     }
 
-    public void Explode()
+    public ExplosionData Explode()
     {
         if (isBombCreated)
         {
-            Explode(curBomb.transform.position);
+            Vector3 pos = bomb.position;
+            Explode(pos);
+            return new ExplosionData 
+            {
+                position = pos, 
+                radius = _bombRadius 
+            };
         }
+        return new ExplosionData();
     }
 
     public void RemoveBomb()
@@ -66,19 +68,15 @@ public class BombCreator : MonoBehaviour
         if (isBombCreated)
         {
             isBombCreated = false;
-            Destroy(curBomb);
+            Destroy(bomb.gameObject);
         }
     }
 
     private void Explode(Vector3 p)
     {
-        _bombSound.transform.position = curBomb.transform.position;
+        _bombSound.transform.position = bomb.position;
         _bombSound.Play();
-        Destroy(curBomb);
-        float humStr = 0f;
-        float redStr = 0f;
-        _mapper.GetAreaStrength(p, _bombRadius, ref humStr, ref redStr);
-        _main.Explode(humStr, redStr);
+        Destroy(bomb.gameObject);
         isBombCreated = false;
     }
 }

@@ -24,8 +24,8 @@ public class Input : MonoBehaviour
     {
         InputMove = InputSystem.actions.FindAction("Move");
         InputLook = InputSystem.actions.FindAction("Look");
-        InputAttack1 = InputSystem.actions.FindAction("Attack");
-        InputAttack2 = InputSystem.actions.FindAction("Attack");
+        InputAttack1 = InputSystem.actions.FindAction("Attack1");
+        InputAttack2 = InputSystem.actions.FindAction("Attack2");
         InputInteract = InputSystem.actions.FindAction("Interact");
         InputScroll = InputSystem.actions.FindAction("ScrollWheel");
     }

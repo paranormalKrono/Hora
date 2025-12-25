@@ -19,7 +19,7 @@ public class Rotor : MonoBehaviour
 
     private void Start()
     {
-        Unity.Mathematics.Random random = new Unity.Mathematics.Random();
+        Unity.Mathematics.Random random = new((uint)Random.Range(0, int.MaxValue - 1));
         tiltSide = random.NextFloat(-1f, 1f) > 0f;
         rotationDirection = random.NextFloat(-1f, 1f) > 0f ? -1f : 1f;
 

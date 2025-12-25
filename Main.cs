@@ -1,17 +1,19 @@
-using NamespaceWorld;
+
+using NWorld;
 using System;
 using System.Collections;
 using UnityEngine;
+using static BombCreator;
 using static MenuUI;
 
 public class Main : MonoBehaviour
 {
     [SerializeField] private Input _input;
     [SerializeField] private CameraMover _cameraMover;
-    [SerializeField] private CursorSelector _cursorTowerSelector;
     [SerializeField] private MenuUI _ui;
     [SerializeField] private Mapper _mapper;
     [SerializeField] private HoraTimer _timer;
+    [SerializeField] private BombCreator _bombCreator;
 
     [SerializeField] private GameObject _locationMain;
     [SerializeField] private GameObject _locationSettings;
@@ -47,9 +49,9 @@ public class Main : MonoBehaviour
 
     private void Awake()
     {
-        _ui._OnExit = (_) => Application.Quit();
+        _ui.OnExit = (_) => Application.Quit();
 
-        _ui._OnSettings = (_) =>
+        _ui.OnSettings = (_) =>
         {
             _ui.CloseMenu(Menu.Main);
             _ui.OpenMenu(Menu.Settings);
@@ -57,14 +59,14 @@ public class Main : MonoBehaviour
             _locationSettings.SetActive(true);
             _cameraMover.MoveCameraTo(target: _cameraPlaceSettings, OnMoved: () => _locationMain.SetActive(false));
         };
-        _ui._OnSettingsClose = (_) =>
+        _ui.OnSettingsClose = (_) =>
         {
             _ui.OpenMenu(Menu.Main);
             _ui.CloseMenu(Menu.Settings);
             _locationMain.SetActive(true);
             _cameraMover.MoveCameraTo(target: _cameraPlaceMenu, OnMoved: () => _locationSettings.SetActive(false));
         };
-        _ui._OnTitles = (_) =>
+        _ui.OnTitles = (_) =>
         {
             _ui.CloseMenu(Menu.Main);
             _ui.OpenMenu(Menu.Titles);
@@ -72,7 +74,7 @@ public class Main : MonoBehaviour
             _locationTitles.SetActive(true);
             _cameraMover.MoveCameraTo(target: _cameraPlaceTitles, OnMoved: () => _locationMain.SetActive(false)); 
         };
-        _ui._OnTitlesClose = (_) =>
+        _ui.OnTitlesClose = (_) =>
         {
             _ui.OpenMenu(Menu.Main);
             _ui.CloseMenu(Menu.Titles);
@@ -88,7 +90,7 @@ public class Main : MonoBehaviour
             _ui.TimerHoraSet((int)_timer.Value);
         };
 
-        _ui._OnPlay = (_) => PlayFresh();
+        _ui.OnPlay = (_) => PlayFresh();
 
         _locationGame.SetActive(false);
     }
@@ -97,7 +99,7 @@ public class Main : MonoBehaviour
     {
         if (_state == State.Menu)
         {
-            _ui._OnPlay = null;
+            _ui.OnPlay = null;
             _mapper.Unbuild();
 
             _ui.TimerGlobalSet(_timerGlobalStartTime);
@@ -108,12 +110,12 @@ public class Main : MonoBehaviour
 
     private void PlayContinue()
     {
-        _ui._OnPlay = null;
+        _ui.OnPlay = null;
         _ui.CloseMenu(Menu.Main);
         _ui.OpenMenu(Menu.TimerUp);
         _ui.OpenMenu(Menu.TimerGlobal);
         _locationGame.SetActive(true);
-        _mapper.SetGame(true);
+        _mapper.SetState(Mapper.State.Game);
         _cameraMover.MoveCameraTo(_cameraPlaceGame, SetGame);
     }
 
@@ -141,8 +143,8 @@ public class Main : MonoBehaviour
         _ui.CloseMenu(Menu.TimerCenter);
         _ui.OpenMenu(Menu.TimerUp);
         _ui.OpenMenu(Menu.TimerGlobal);
-        _mapper.Build((uint)UnityEngine.Random.Range(0, int.MaxValue));
-        _mapper.SetGame(true);
+        _mapper.Build();
+        _mapper.SetState(Mapper.State.Game);
         _locationGame.SetActive(true);
         _cameraMover.MoveCameraTo(target: _cameraPlaceGame, OnMoved: SetGame);
     }
@@ -154,34 +156,28 @@ public class Main : MonoBehaviour
         _locationSettings.SetActive(false);
         _locationTitles.SetActive(false);
         _input.OnMove = (Vector2 moveDirection) => _cameraMover.CameraSphereLook(moveDirection);
-        WorldTowers towers = _mapper.world._towers;
-        _input.OnLook = (Vector2 lookDirection) => towers.TowerSelectedMove(lookDirection);
-        _input.OnScroll = (float scrollWheel) => towers.TowerSelectedMoveScroll(scrollWheel);
+        _input.OnLook = (Vector2 lookDirection) => _bombCreator.MoveBomb(lookDirection);
+        _input.OnScroll = (float scrollWheel) => _bombCreator.MoveBombScroll(scrollWheel);
         _input.OnAttack1 = () =>
-        { // Check cursor and place or grab tower
-            if (_cursorTowerSelector.TrySelectRaycast(out Transform tower)) 
+        {
+            if (_bombCreator.IsBombCreated)
             {
-                towers.TowerSelect(tower);
+                ExplosionData data = _bombCreator.Explode();
+                WorldExplosionData explosionData = _mapper.Explosion(data.position, data.radius);
+                Score(explosionData.whiteValue, explosionData.redValue);
             }
             else
             {
-                if (towers.State == WorldTowers.SelectionState.Nothing)
-                {
-                    towers.TowerCreateSelect(NamespaceFactoryTowers.TowerType.Center);
-                }
-                else
-                {
-                    towers.TowerSelectedPlace();
-                }
+                _bombCreator.CreateBomb();
             }
         };
-        _input.OnAttack2 = () => towers.TowerSelectedDestroy();
+        _input.OnAttack2 = _bombCreator.RemoveBomb;
         _input.OnInteract = () =>
         { // Pause game
             Cursor.lockState = CursorLockMode.None;
             UnsetGameInput();
             _timer.Stop();
-            _mapper.SetGame(false);
+            _mapper.SetState(Mapper.State.Paused);
             _state = State.Menu;
             _ui.CloseMenu(Menu.TimerUp);
             _ui.CloseMenu(Menu.TimerGlobal);
@@ -189,13 +185,13 @@ public class Main : MonoBehaviour
             _locationMain.SetActive(true);
             _locationGame.SetActive(false);
             _cameraMover.MoveCameraTo(target: _cameraPlaceMenu);
-            _ui._OnPlay = (_) => PlayContinue();
+            _ui.OnPlay = (_) => PlayContinue();
         };
         _input.IsWorking = true;
         _timer.StartTimer(target_value: 0f, speed: 1f, OnTimerEnd: () =>
         { // Defeat
             UnsetGameInput();
-            _mapper._isGame = false;
+            _mapper.SetState(Mapper.State.Paused);
             _ui.OpenMenu(Menu.Defeat);
             _ui.OpenMenu(Menu.Continue);
             _input.OnInteract = () => 
@@ -214,13 +210,12 @@ public class Main : MonoBehaviour
                     _locationGame.SetActive(false);
                     _mapper.Unbuild();
                 });
-                _ui._OnPlay = (_) => PlayFresh();
+                _ui.OnPlay = (_) => PlayFresh();
             };
         });
     }
 
-    // TO DO
-    private void Score(Vector3 pos)
+    private void Score(float whiteValue, float redValue)
     {
         if (_isScore)
         {
@@ -231,16 +226,15 @@ public class Main : MonoBehaviour
         {
             _ui.OpenMenu(Menu.Score);
         }
-        _IScore = IScore(pos);
+        _IScore = IScore(whiteValue, redValue);
         StartCoroutine(_IScore);
     }
 
-    private IEnumerator IScore(Vector3 pos)
+    private IEnumerator IScore(float whiteValue, float redValue)
     {
         _isScore = true;
-        _mapper.GetAreaStrength(pos, _bombCreator.BombRadius, out float hum, out float red);
-        float humScore = humanCoef * hum;
-        float redScore = redCoef * red;
+        float humScore = humanCoef * whiteValue;
+        float redScore = redCoef * redValue;
         _timer.Change(redScore - humScore);
         _ui.TimerHoraScoreChange(scoreHuman: humScore, scoreRed: redScore);
         yield return new WaitForSeconds(_waitScore);

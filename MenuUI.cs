@@ -55,12 +55,12 @@ public class MenuUI : MonoBehaviour
         TimerGlobal,
     }
 
-    public UnityAction<ClickEvent> _OnPlay;
-    public UnityAction<ClickEvent> _OnSettings;
-    public UnityAction<ClickEvent> _OnSettingsClose;
-    public UnityAction<ClickEvent> _OnTitles;
-    public UnityAction<ClickEvent> _OnTitlesClose;
-    public UnityAction<ClickEvent> _OnExit;
+    public UnityAction<ClickEvent> OnPlay;
+    public UnityAction<ClickEvent> OnSettings;
+    public UnityAction<ClickEvent> OnSettingsClose;
+    public UnityAction<ClickEvent> OnTitles;
+    public UnityAction<ClickEvent> OnTitlesClose;
+    public UnityAction<ClickEvent> OnExit;
 
 
     private void Awake()
@@ -95,11 +95,11 @@ public class MenuUI : MonoBehaviour
         _buttonExit = root.Q<Button>("ButtonExit");
 
 
-        _buttonPlay.RegisterCallback((ClickEvent clickEvent) => _OnPlay?.Invoke(clickEvent));
-        _buttonSettings.RegisterCallback((ClickEvent clickEvent) => _OnSettings?.Invoke(clickEvent));
-        _buttonSettingsClose.RegisterCallback((ClickEvent clickEvent) => _OnSettingsClose?.Invoke(clickEvent));
-        _buttonTitles.RegisterCallback((ClickEvent clickEvent) => _OnTitles?.Invoke(clickEvent));
-        _buttonTitlesClose.RegisterCallback((ClickEvent clickEvent) => _OnTitlesClose?.Invoke(clickEvent));
+        _buttonPlay.RegisterCallback((ClickEvent clickEvent) => OnPlay?.Invoke(clickEvent));
+        _buttonSettings.RegisterCallback((ClickEvent clickEvent) => OnSettings?.Invoke(clickEvent));
+        _buttonSettingsClose.RegisterCallback((ClickEvent clickEvent) => OnSettingsClose?.Invoke(clickEvent));
+        _buttonTitles.RegisterCallback((ClickEvent clickEvent) => OnTitles?.Invoke(clickEvent));
+        _buttonTitlesClose.RegisterCallback((ClickEvent clickEvent) => OnTitlesClose?.Invoke(clickEvent));
 
         _settingsTranslation = root.Q<DropdownField>("DropdownTranslation");
         _settingsTranslation.RegisterValueChangedCallback((evt) =>
